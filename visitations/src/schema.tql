@@ -1,0 +1,104 @@
+define
+
+# attributes
+    
+    start_date sub attribute,
+        value datetime;
+
+    end_date sub attribute,
+        value datetime;
+
+    name sub attribute,
+        value string;
+    
+    firstname sub attribute,
+        value string;
+
+    lastname sub attribute,
+        value string;
+
+#  entities
+
+    person sub entity,
+        owns firstname,
+        owns lastname,
+        plays friendship:person1,
+        plays friendship:person2,
+        plays nationality:person,
+        plays visited:person;
+
+    city sub entity,
+        owns name,
+        plays visited:destination;
+
+    country sub entity,
+        owns name,
+        plays nationality:homeland;
+
+# relations
+
+    visited sub relation,
+        relates person,
+        relates destination,
+        owns start_date,
+        owns end_date;
+
+    friendship sub relation,
+        relates person1,
+        relates person2;
+
+    nationality sub relation,
+        relates person,
+        relates homeland;
+
+# rules
+
+rule friendship-is-mutual:
+    when {
+        (person1: $x, person2: $y) isa friendship;
+    } then {
+        (person1: $y, person2: $x) isa friendship;
+    };
+
+rule friends-friend-is-a-friend:
+    when {
+        (person1: $x, person2: $y) isa friendship;
+        (person1: $y, person2: $z) isa friendship;
+    } then {
+        (person1: $x, person2: $z) isa friendship;
+    };
+
+rule people-from-same-country-are-friends: 
+    when {
+        (person: $person1, homeland: $x) isa nationality;
+        (person: $person2, homeland: $x) isa nationality;
+    } then {
+        (person1: $person1, person: $person2) isa friendship;
+    };
+
+rule person-with-georgian-surname-is-georgian:
+    when {
+        $p isa person;
+        {$p has lastname "Toloraia";} or {$p has lastname "Skhulukhia";} or {$p has lastname "Tsintsadze";};
+        $c isa country, has name "Georgia";
+    } then {
+        (person: $p, homeland: $c) isa nationality;
+    };
+
+rule person-with-usa-surname-is-from-usa:
+    when {
+        $p isa person;
+        {$p has lastname "Smith";} or {$p has lastname "Johnson";} or {$p has lastname "Williams";};
+        $c isa country, has name "United States of America";
+    } then {
+        (person: $p, homeland: $c) isa nationality;
+    };
+
+rule person-with-uk-surname-is-from-uk:
+    when {
+        $p isa person;
+        {$p has lastname "Davies";} or {$p has lastname "Patel";} or {$p has lastname "Mitchell";};
+        $c isa country, has name "United Kingdom";
+    } then {
+        (person: $p, homeland: $c) isa nationality;
+    };

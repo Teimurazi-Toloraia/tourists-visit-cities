@@ -1,0 +1,14 @@
+[package]
+name = "src"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+typedb-client = { path = "C:\\Users\\temot\\OneDrive\\desktop\\Programming\\initial vaticle\\typedb_client-cargo-workspace\\typedb-client" }
+futures = "0.3"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+text_io = "0.1.12"
+chrono = "0.3"
+rand = "0.8"
