@@ -73,7 +73,7 @@ rule people-from-same-country-are-friends:
         (person: $person1, homeland: $x) isa nationality;
         (person: $person2, homeland: $x) isa nationality;
     } then {
-        (person1: $person1, person: $person2) isa friendship;
+        (person1: $person1, person2: $person2) isa friendship;
     };
 
 rule person-with-georgian-surname-is-georgian:

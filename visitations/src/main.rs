@@ -9,7 +9,7 @@ use typedb_client::{
   
   
   
-  const DATABASE: &str = "tourists visiting cities database";
+  const DATABASE: &str = "database describing tourists visiting cities";
   
   fn new_core_connection() -> typedb_client::Result<Connection> {
     Connection::new_plaintext("localhost:1729")
