@@ -1,11 +1,11 @@
 use std::fs::{self};
-// use std::io;
 use text_io::read;
 
 use typedb_client::{
     Connection, DatabaseManager, Options, Session,
     SessionType::{Data, Schema},
-    TransactionType::{Read, Write}, // transaction, Transaction,
+    Transaction,
+    TransactionType::{Read, Write},
 };
 
 const DATABASE: &str = "database describing tourists visiting cities from countries";
@@ -33,31 +33,14 @@ fn create_person_entity(firstname: &str, lastname: &str) -> String {
 async fn create_schema(connection: Connection) -> typedb_client::Result {
     let schema = get_schema();
     let databases = DatabaseManager::new(connection.clone());
-    if databases
-        .contains(DATABASE)
-        .await?
-    {
+    if databases.contains(DATABASE).await? {
         println!("\nSchema Already Defined\n");
     } else {
-        databases
-            .create(DATABASE)
-            .await?;
-        let session = Session::new(
-            databases
-                .get(DATABASE)
-                .await?,
-            Schema,
-        )
-        .await?;
-        let transaction = session
-            .transaction(Write)
-            .await?;
-        transaction
-            .query()
-            .define(schema.as_str())
-            .await?;
+        databases.create(DATABASE).await?;
+        let session = Session::new(databases.get(DATABASE).await?, Schema).await?;
+        let transaction = session.transaction(Write).await?;
+        transaction.query().define(schema.as_str()).await?;
         transaction.commit().await?;
-        drop(session);
         println!("\nSchema Defined Successfully\n");
     }
 
@@ -79,13 +62,28 @@ fn create_visited_relationship(
     )
 }
 
-async fn create_data(connection: Connection) ->  typedb_client::Result  {
+fn insert_data(
+    transaction: &Transaction<'_>,
+    first_name: &str,
+    last_name: &str,
+    cities: Vec<&str>,
+    end: i32,
+    start: i32,
+    months: Vec<i32>,
+) {
+    for (city, month_id) in cities.iter().zip(months.iter()) {
+        let _ = transaction.query().insert(
+            &create_visited_relationship(start, end, first_name, last_name, city, *month_id)
+                .as_str(),
+        );
+    }
+}
+
+async fn create_data(connection: Connection) -> typedb_client::Result {
     let databases = DatabaseManager::new(connection.clone());
     // insert data
-    let session = Session::new(databases.get(DATABASE).await.unwrap(), Data)
-        .await
-        .unwrap();
-    let transaction = session.transaction(Write).await.unwrap();
+    let session = Session::new(databases.get(DATABASE).await?, Data).await?;
+    let transaction = session.transaction(Write).await?;
     let cities = ["Tbilisi", "London", "Cambridge", "Zugdidi"];
     cities
         .iter()
@@ -100,8 +98,6 @@ async fn create_data(connection: Connection) ->  typedb_client::Result  {
 
     let geo_first_names = ["Teimurazi", "Natalia", "Luka", "Irakli", "Giorgi", "Robiko"];
     let geo_last_names = ["Toloraia", "Skhulukhia", "Tsintsadze"];
-    // let geo_first_names = ["Teimurazi", "Natalia"];
-    // let geo_last_names = ["Toloraia", "Skhulukhia"];
     let mut duration = 0;
     let mut start = 9;
     for first_name in geo_first_names {
@@ -115,9 +111,16 @@ async fn create_data(connection: Connection) ->  typedb_client::Result  {
                 .insert(&create_person_entity(first_name, last_name));
             // Insert visits
             let end = start + duration;
-            let _ = transaction.query().insert(
-                &create_visited_relationship(start, end, first_name, last_name, "Cambridge", 1)
-                    .as_str(),
+            let cities: Vec<&str> = ["Cambridge", "London"].to_vec();
+            let months: Vec<i32> = [1, 3].to_vec();
+            insert_data(
+                &transaction,
+                first_name,
+                last_name,
+                cities,
+                end,
+                start,
+                months,
             );
         }
     }
@@ -128,8 +131,6 @@ async fn create_data(connection: Connection) ->  typedb_client::Result  {
     start = 9;
     let uk_first_names = ["James", "Olivia", "William", "Amelia", "Jack"];
     let uk_last_names = ["Davies", "Patel", "Mitchell"];
-    // let uk_first_names = ["James", "Olivia"];
-    // let uk_last_names = ["Davies", "Patel"];
     for first_name in uk_first_names {
         start += 1;
         for last_name in uk_last_names {
@@ -141,9 +142,16 @@ async fn create_data(connection: Connection) ->  typedb_client::Result  {
                 .insert(&&create_person_entity(first_name, last_name));
             // Insert visits
             let end = start + duration;
-            let _ = transaction.query().insert(
-                &create_visited_relationship(start, end, first_name, last_name, "Tbilisi", 1)
-                    .as_str(),
+            let cities: Vec<&str> = ["Zugdidi", "Tbilisi"].to_vec();
+            let months: Vec<i32> = [1, 3].to_vec();
+            insert_data(
+                &transaction,
+                first_name,
+                last_name,
+                cities,
+                end,
+                start,
+                months,
             );
         }
     }
@@ -154,8 +162,6 @@ async fn create_data(connection: Connection) ->  typedb_client::Result  {
     start = 9;
     let us_first_names = ["John", "Emma", "Michael", "Sophia", "David"];
     let us_last_names = ["Smith", "Johnson", "Williams"];
-    // let us_first_names = ["John", "Emma"];
-    // let us_last_names = ["Smith", "Johnson"];
     for first_name in us_first_names {
         start += 1;
         for last_name in us_last_names {
@@ -167,18 +173,24 @@ async fn create_data(connection: Connection) ->  typedb_client::Result  {
                 .insert(&&create_person_entity(first_name, last_name));
             // Insert visits
             let end = start + duration;
-            let _ = transaction.query().insert(
-                &create_visited_relationship(start, end, first_name, last_name, "Tbilisi", 1)
-                    .as_str(),
+            let cities: Vec<&str> = ["Zugdidi", "Tbilisi"].to_vec();
+            let months: Vec<i32> = [1, 3].to_vec();
+            insert_data(
+                &transaction,
+                first_name,
+                last_name,
+                cities,
+                end,
+                start,
+                months,
             );
         }
     }
 
-    transaction.commit().await.unwrap();
+    transaction.commit().await?;
 
     Ok(())
 }
-
 
 fn get_the_list_of_cities(_connection: Connection) -> Vec<&'static str> {
     vec!["London", "Tbilisi", "Zugdidi", "Cambridge"]
@@ -200,15 +212,11 @@ async fn get_most_visited_city(connection: Connection) -> typedb_client::Result<
 
 async fn number_of_times_visited(connection: Connection, city: &str) -> typedb_client::Result<i64> {
     let databases = DatabaseManager::new(connection.clone());
-    let session = Session::new(databases.get(DATABASE).await.unwrap(), Data)
-        .await
-        .unwrap();
-    // let transaction = session.transaction(Read).await.unwrap();
+    let session = Session::new(databases.get(DATABASE).await?, Data).await?;
     let with_inference = Options::new().infer(true);
     let transaction = session
         .transaction_with_options(Read, with_inference)
-        .await
-        .unwrap();
+        .await?;
     let query = format!(
         r#"match
                           $city isa city, has name "{city}";
@@ -216,25 +224,21 @@ async fn number_of_times_visited(connection: Connection, city: &str) -> typedb_c
                           get $p;
                           count;"#
     );
-    let answer = transaction
-        .query()
-        .match_aggregate(&query.as_str())
-        .await
-        .unwrap();
+    let answer = transaction.query().match_aggregate(&query.as_str()).await?;
     Ok(answer.into_i64())
 }
 
-async fn friends_met(connection: Connection, firstname: &str, lastname: &str) -> i64 {
+async fn friends_met(
+    connection: Connection,
+    firstname: &str,
+    lastname: &str,
+) -> typedb_client::Result<i64> {
     let databases = DatabaseManager::new(connection.clone());
-    let session = Session::new(databases.get(DATABASE).await.unwrap(), Data)
-        .await
-        .unwrap();
-    // let transaction = session.transaction(Read).await.unwrap();
+    let session = Session::new(databases.get(DATABASE).await?, Data).await?;
     let with_inference = Options::new().infer(true);
     let transaction = session
         .transaction_with_options(Read, with_inference)
-        .await
-        .unwrap();
+        .await?;
     let query = format!(
         r#"match
                                       $p isa person, has firstname "{firstname}", has lastname "{lastname}";
@@ -246,16 +250,12 @@ async fn friends_met(connection: Connection, firstname: &str, lastname: &str) ->
                                     get $friend, $t; count;"#
     );
 
-    let answer = transaction
-        .query()
-        .match_aggregate(&query.as_str())
-        .await
-        .unwrap();
-    answer.into_i64()
+    let answer = transaction.query().match_aggregate(&query.as_str()).await?;
+    Ok(answer.into_i64())
 }
 
 #[tokio::main]
-async fn main() ->  typedb_client::Result  {
+async fn main() -> typedb_client::Result {
     let connection = new_core_connection().expect("creating connection");
 
     create_schema(connection.clone()).await?;
@@ -291,7 +291,7 @@ async fn main() ->  typedb_client::Result  {
 
                 println!(
                     "{firstname} {lastname} met a friend {} times",
-                    friends_met(connection.clone(), firstname.as_str(), lastname.as_str()).await
+                    friends_met(connection.clone(), firstname.as_str(), lastname.as_str()).await?
                 );
             }
             _ => println!("Query entered is not 1,2,3 or 0\n"),
